@@ -32,35 +32,59 @@ function buscarCuentas() {
     const cuentasUnicas = encontrados ? [...new Set(encontrados)] : [];
     
     const tbody = document.querySelector("#resultTable tbody");
-    tbody.innerHTML = "<tr><td colspan='4'>Procesando...</td></tr>"; 
+    tbody.innerHTML = "<tr><td colspan='4'>Ordenando resultados...</td></tr>"; 
 
-    if (cuentasUnicas.length === 0) return alert("No hay cuentas.");
+    if (cuentasUnicas.length === 0) return alert("No se detectaron cuentas.");
 
-    // OPTIMIZACIÓN 2: Construir todo el HTML en una variable (String Builder)
-    let htmlFinal = "";
+    // 1. Recolectamos todos los datos en un Array para poder ordenarlos
+    let resultados = [];
 
     cuentasUnicas.forEach(cuentaBuscada => {
         const buscar = cuentaBuscada.replace(/^0+/, '');
-        const fila = inventarioMap.get(buscar); // Búsqueda instantánea O(1)
+        const fila = inventarioMap.get(buscar);
 
         if (fila) {
-            const qr = fila[6] || "N/A";
-            const lat = fila[16] || "";
-            const lon = fila[17] || "";
-            const urlMaps = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
-
-            htmlFinal += `
-                <tr>
-                    <td><b>${cuentaBuscada}</b></td>
-                    <td style="color:#e67e22; font-weight:bold;">${qr}</td>
-                    <td>${lat}, ${lon}</td>
-                    <td><a href="${urlMaps}" target="_blank" style="background:#27ae60; color:white; padding:4px 8px; text-decoration:none; border-radius:4px; font-size:12px;">📍 Mapa</a></td>
-                </tr>`;
+            resultados.push({
+                cuenta: cuentaBuscada,
+                qr: fila[6] || "N/A",
+                lat: fila[16] || "",
+                lon: fila[17] || "",
+                encontrado: true
+            });
         } else {
-            htmlFinal += `<tr style="background:#fff5f5"><td>${cuentaBuscada}</td><td colspan="3" style="color:red; font-size:12px;">No encontrada</td></tr>`;
+            resultados.push({
+                cuenta: cuentaBuscada,
+                qr: "SIN REGISTRO", // Esto ayuda a mandarlos al final al ordenar
+                lat: "",
+                lon: "",
+                encontrado: false
+            });
         }
     });
 
-    // Inyectar todo el bloque de una sola vez
+    // 2. ORDENAR: Comparamos los QRs para que salgan acomodados (A-Z)
+    resultados.sort((a, b) => a.qr.localeCompare(b.qr));
+
+    // 3. GENERAR EL HTML ya ordenado
+    let htmlFinal = "";
+    resultados.forEach(res => {
+        if (res.encontrado) {
+            const urlMaps = `http://googleusercontent.com/maps.google.com/search/?api=1&query=${res.lat},${res.lon}`;
+            htmlFinal += `
+                <tr>
+                    <td><b>${res.cuenta}</b></td>
+                    <td style="color:#e67e22; font-weight:bold;">${res.qr}</td>
+                    <td style="font-size: 11px;">${res.lat}, ${res.lon}</td>
+                    <td><a href="${urlMaps}" target="_blank" style="background:#27ae60; color:white; padding:4px 8px; text-decoration:none; border-radius:4px; font-size:12px;">📍 Mapa</a></td>
+                </tr>`;
+        } else {
+            htmlFinal += `
+                <tr style="background:#fff5f5">
+                    <td>${res.cuenta}</td>
+                    <td colspan="3" style="color:#c0392b; font-size:11px;">No encontrada en inventario</td>
+                </tr>`;
+        }
+    });
+
     tbody.innerHTML = htmlFinal;
 }
