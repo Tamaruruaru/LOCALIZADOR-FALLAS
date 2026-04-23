@@ -32,13 +32,13 @@ function buscarCuentas() {
     const cuentasUnicas = encontrados ? [...new Set(encontrados)] : [];
     
     const tbody = document.querySelector("#resultTable tbody");
-    tbody.innerHTML = "<tr><td colspan='4'>Ordenando resultados...</td></tr>"; 
+    tbody.innerHTML = "<tr><td colspan='4'>Agrupando por QR...</td></tr>"; 
 
-    if (cuentasUnicas.length === 0) return alert("No se detectaron cuentas.");
+    if (cuentasUnicas.length === 0) return alert("No hay cuentas.");
 
-    // 1. Recolectamos todos los datos en un Array para poder ordenarlos
     let resultados = [];
 
+    // 1. Extraer datos de la memoria
     cuentasUnicas.forEach(cuentaBuscada => {
         const buscar = cuentaBuscada.replace(/^0+/, '');
         const fila = inventarioMap.get(buscar);
@@ -46,7 +46,7 @@ function buscarCuentas() {
         if (fila) {
             resultados.push({
                 cuenta: cuentaBuscada,
-                qr: fila[6] || "N/A",
+                qr: fila[6] || "Z-SIN-QR", // Usamos Z para mandarlos al final
                 lat: fila[16] || "",
                 lon: fila[17] || "",
                 encontrado: true
@@ -54,7 +54,7 @@ function buscarCuentas() {
         } else {
             resultados.push({
                 cuenta: cuentaBuscada,
-                qr: "SIN REGISTRO", // Esto ayuda a mandarlos al final al ordenar
+                qr: "Z-NO-ENCONTRADA", 
                 lat: "",
                 lon: "",
                 encontrado: false
@@ -62,29 +62,37 @@ function buscarCuentas() {
         }
     });
 
-    // 2. ORDENAR: Comparamos los QRs para que salgan acomodados (A-Z)
-    resultados.sort((a, b) => a.qr.localeCompare(b.qr));
+    // 2. ORDEN NATURAL (Acomoda TP2 antes de TP10 y agrupa por QR)
+    const colador = new Intl.Collator(undefined, {numeric: true, sensitivity: 'base'});
+    resultados.sort((a, b) => colador.compare(a.qr, b.qr));
 
-    // 3. GENERAR EL HTML ya ordenado
+    // 3. RENDERIZAR (Construir tabla)
     let htmlFinal = "";
+    let ultimoQR = "";
+
     resultados.forEach(res => {
+        // Separador visual opcional: si cambia el QR, podemos poner una línea o espacio
+        const estiloFila = res.encontrado ? "" : "background:#fff5f5; color:#c0392b;";
+        const qrMostrable = res.encontrado ? res.qr : "NO ENCONTRADA";
+
         if (res.encontrado) {
-            const urlMaps = `http://googleusercontent.com/maps.google.com/search/?api=1&query=${res.lat},${res.lon}`;
+            const urlMaps = `https://www.google.com/maps/search/?api=1&query=${res.lat},${res.lon}`;
             htmlFinal += `
-                <tr>
+                <tr style="${estiloFila}">
                     <td><b>${res.cuenta}</b></td>
-                    <td style="color:#e67e22; font-weight:bold;">${res.qr}</td>
+                    <td style="color:#d35400; font-weight:bold; border-left: 3px solid #e67e22;">${qrMostrable}</td>
                     <td style="font-size: 11px;">${res.lat}, ${res.lon}</td>
-                    <td><a href="${urlMaps}" target="_blank" style="background:#27ae60; color:white; padding:4px 8px; text-decoration:none; border-radius:4px; font-size:12px;">📍 Mapa</a></td>
+                    <td><a href="${urlMaps}" target="_blank" style="background:#27ae60; color:white; padding:4px 8px; text-decoration:none; border-radius:4px; font-size:11px;">📍 Mapa</a></td>
                 </tr>`;
         } else {
             htmlFinal += `
-                <tr style="background:#fff5f5">
+                <tr style="${estiloFila}">
                     <td>${res.cuenta}</td>
-                    <td colspan="3" style="color:#c0392b; font-size:11px;">No encontrada en inventario</td>
+                    <td colspan="3" style="font-style: italic;">Sin registro en inventario</td>
                 </tr>`;
         }
     });
 
     tbody.innerHTML = htmlFinal;
+}
 }
