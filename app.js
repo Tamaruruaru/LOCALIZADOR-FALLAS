@@ -4,7 +4,7 @@ let baseDeDatos = [];
 window.onload = async function() {
     try {
         // Asegúrate de que el nombre del archivo en GitHub sea exactamente este:
-        const respuesta = await fetch('SEM 17 Cuentas inventariadas Ciudad Juarez.xlsx - Sheet1.csv');
+        const respuesta = await fetch('SEM 17 Cuentas inventariadas Ciudad Juarez.xlsx');
         const contenido = await respuesta.text();
         
         // Detectar separador (coma o punto y coma)
