@@ -1,28 +1,27 @@
-let baseDeDatos = [];
+let inventarioMap = new Map();
 
 window.onload = async function() {
     try {
-        // Usamos el nombre corto y nuevo
         const respuesta = await fetch('inventario.csv');
         const contenido = await respuesta.text();
-        
         const lineas = contenido.split(/\r?\n/);
         
-        baseDeDatos = lineas
-            .filter(l => l.trim() !== "")
-            .map(l => {
-                // Separamos por coma o punto y coma
-                let sep = l.includes(';') ? ';' : ',';
-                return l.split(sep).map(celda => celda.trim().replace(/^"|"$/g, ''));
-            });
+        // OPTIMIZACIÓN 1: Creamos un Mapa para búsquedas instantáneas
+        lineas.forEach(l => {
+            if (!l.trim()) return;
+            let sep = l.includes(';') ? ';' : ',';
+            let columnas = l.split(sep).map(c => c.trim().replace(/^"|"$/g, ''));
+            
+            // Usamos la cuenta (columna 8 / índice 7) como llave
+            if (columnas[7]) {
+                let cuentaLimpia = columnas[7].replace(/^0+/, '');
+                inventarioMap.set(cuentaLimpia, columnas);
+            }
+        });
 
-        console.log("Inventario cargado. Columnas:", baseDeDatos[0].length);
-        if(baseDeDatos[0].length > 1) {
-            document.body.insertAdjacentHTML('afterbegin', '<p style="color:green; font-weight:bold;">✅ Base de datos conectada</p>');
-        }
+        alert("✅ Base de datos lista: " + inventarioMap.size + " registros cargados.");
     } catch (e) {
-        console.error("Error al cargar el CSV:", e);
-        alert("Error: No se encontró el archivo inventario.csv en el servidor.");
+        alert("Error cargando inventario.csv");
     }
 };
 
@@ -32,34 +31,36 @@ function buscarCuentas() {
     const encontrados = texto.match(regex);
     const cuentasUnicas = encontrados ? [...new Set(encontrados)] : [];
     
-    const tabla = document.querySelector("#resultTable tbody");
-    tabla.innerHTML = ""; 
+    const tbody = document.querySelector("#resultTable tbody");
+    tbody.innerHTML = "<tr><td colspan='4'>Procesando...</td></tr>"; 
 
-    if (cuentasUnicas.length === 0) return alert("No se detectaron cuentas de 10 dígitos.");
+    if (cuentasUnicas.length === 0) return alert("No hay cuentas.");
+
+    // OPTIMIZACIÓN 2: Construir todo el HTML en una variable (String Builder)
+    let htmlFinal = "";
 
     cuentasUnicas.forEach(cuentaBuscada => {
-        const buscar = cuentaBuscada.replace(/^0+/, ''); // Quitar ceros a la izquierda
-
-        // Buscamos en toda la fila por seguridad
-        const fila = baseDeDatos.find(r => r.some(c => c.replace(/^0+/, '') === buscar));
+        const buscar = cuentaBuscada.replace(/^0+/, '');
+        const fila = inventarioMap.get(buscar); // Búsqueda instantánea O(1)
 
         if (fila) {
-            // Buscamos los datos por su forma (TP para QR, 31 para Lat, -106 para Lon)
-            const qr = fila.find(c => c.toUpperCase().startsWith('TP')) || "N/A";
-            const lat = fila.find(c => c.startsWith('31.')) || "";
-            const lon = fila.find(c => c.includes('-106.')) || "";
-            
+            const qr = fila[6] || "N/A";
+            const lat = fila[16] || "";
+            const lon = fila[17] || "";
             const urlMaps = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
 
-            tabla.innerHTML += `
+            htmlFinal += `
                 <tr>
                     <td><b>${cuentaBuscada}</b></td>
                     <td style="color:#e67e22; font-weight:bold;">${qr}</td>
                     <td>${lat}, ${lon}</td>
-                    <td><a href="${urlMaps}" target="_blank" style="background:#27ae60; color:white; padding:5px 10px; text-decoration:none; border-radius:4px;">📍 Mapa</a></td>
+                    <td><a href="${urlMaps}" target="_blank" style="background:#27ae60; color:white; padding:4px 8px; text-decoration:none; border-radius:4px; font-size:12px;">📍 Mapa</a></td>
                 </tr>`;
         } else {
-            tabla.innerHTML += `<tr><td>${cuentaBuscada}</td><td colspan="3" style="color:red;">No encontrada en inventario</td></tr>`;
+            htmlFinal += `<tr style="background:#fff5f5"><td>${cuentaBuscada}</td><td colspan="3" style="color:red; font-size:12px;">No encontrada</td></tr>`;
         }
     });
+
+    // Inyectar todo el bloque de una sola vez
+    tbody.innerHTML = htmlFinal;
 }
