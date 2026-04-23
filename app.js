@@ -1,4 +1,5 @@
 let inventarioMap = new Map();
+let resultadosActuales = []; // Guardaremos aquí lo que se encontró
 
 window.onload = async function() {
     try {
@@ -10,18 +11,13 @@ window.onload = async function() {
             if (!l.trim()) return;
             let sep = l.includes(';') ? ';' : ',';
             let columnas = l.split(sep).map(c => c.trim().replace(/^"|"$/g, ''));
-            
-            // Usamos la cuenta (columna 8 / índice 7) como llave
             if (columnas[7]) {
                 let cuentaLimpia = columnas[7].replace(/^0+/, '');
                 inventarioMap.set(cuentaLimpia, columnas);
             }
         });
-
-        console.log("Base de datos lista: " + inventarioMap.size + " registros.");
-    } catch (e) {
-        console.error("Error cargando inventario.csv");
-    }
+        console.log("Inventario cargado.");
+    } catch (e) { console.error("Error al cargar"); }
 };
 
 function buscarCuentas() {
@@ -30,63 +26,66 @@ function buscarCuentas() {
     const encontrados = texto.match(regex);
     const cuentasUnicas = encontrados ? [...new Set(encontrados)] : [];
     
-    const tbody = document.querySelector("#resultTable tbody");
-    tbody.innerHTML = "<tr><td colspan='4'>Procesando y agrupando...</td></tr>"; 
+    resultadosActuales = []; // Limpiar resultados previos
 
-    if (cuentasUnicas.length === 0) return alert("No se detectaron números de cuenta.");
-
-    let encontradosLista = [];
-    let noEncontradosLista = [];
-
-    // 1. Clasificación
     cuentasUnicas.forEach(cuentaBuscada => {
         const buscar = cuentaBuscada.replace(/^0+/, '');
         const fila = inventarioMap.get(buscar);
 
         if (fila) {
-            encontradosLista.push({
+            resultadosActuales.push({
                 cuenta: cuentaBuscada,
                 qr: (fila[6] || "SIN QR").trim().toUpperCase(),
                 lat: fila[16] || "",
                 lon: fila[17] || ""
             });
         } else {
-            noEncontradosLista.push(cuentaBuscada);
+            resultadosActuales.push({
+                cuenta: cuentaBuscada,
+                qr: "ZZ_NO_ENCONTRADA",
+                lat: "", lon: "", encontrado: false
+            });
         }
     });
 
-    // 2. Ordenar por QR (A-Z y numérico)
-    encontradosLista.sort((a, b) => a.qr.localeCompare(b.qr, undefined, {numeric: true, sensitivity: 'base'}));
+    renderizarTabla(resultadosActuales);
+}
 
-    // 3. Generar HTML (Rápido)
-    let htmlFinal = "";
-    let ultimoQR = "";
+// Función para dibujar la tabla
+function renderizarTabla(datos) {
+    const tbody = document.querySelector("#resultTable tbody");
+    let html = "";
 
-    encontradosLista.forEach(res => {
-        // Marcamos visualmente cuando cambia el QR para ver los grupos
-        const estiloQR = (res.qr !== ultimoQR && ultimoQR !== "") ? "border-top: 2px solid #2c3e50;" : "";
-        ultimoQR = res.qr;
+    datos.forEach(res => {
+        if (res.qr !== "ZZ_NO_ENCONTRADA") {
+            const urlMaps = `https://www.google.com/maps/search/?api=1&query=${res.lat},${res.lon}`;
+            html += `
+                <tr>
+                    <td><b>${res.cuenta}</b></td>
+                    <td style="color:#d35400; font-weight:bold;">${res.qr}</td>
+                    <td style="font-size: 11px;">${res.lat}, ${res.lon}</td>
+                    <td><a href="${urlMaps}" target="_blank" style="background:#27ae60; color:white; padding:4px 8px; text-decoration:none; border-radius:4px; font-size:11px;">📍 Ver Mapa</a></td>
+                </tr>`;
+        } else {
+            html += `<tr style="background:#fff5f5; color:#c0392b;"><td>${res.cuenta}</td><td colspan="3">No encontrada</td></tr>`;
+        }
+    });
+    tbody.innerHTML = html;
+}
 
-        // URL Estándar de Google Maps
-        const urlMaps = `https://www.google.com/maps/search/?api=1&query=${res.lat},${res.lon}`;
+// FUNCIÓN DE FILTRO TIPO EXCEL
+let ordenAscendente = true;
+function ordenarTabla(columnaIndex) {
+    ordenAscendente = !ordenAscendente;
+    
+    resultadosActuales.sort((a, b) => {
+        let valA = columnaIndex === 0 ? a.cuenta : a.qr;
+        let valB = columnaIndex === 0 ? b.cuenta : b.qr;
 
-        htmlFinal += `
-            <tr style="${estiloQR}">
-                <td><b>${res.cuenta}</b></td>
-                <td style="color:#d35400; font-weight:bold; background: #fff8f0;">${res.qr}</td>
-                <td style="font-size: 11px; color: #666;">${res.lat}, ${res.lon}</td>
-                <td><a href="${urlMaps}" target="_blank" style="background:#27ae60; color:white; padding:4px 8px; text-decoration:none; border-radius:4px; font-size:11px;">📍 Ver Mapa</a></td>
-            </tr>`;
+        return ordenAscendente 
+            ? valA.localeCompare(valB, undefined, {numeric: true}) 
+            : valB.localeCompare(valA, undefined, {numeric: true});
     });
 
-    // No encontrados al final
-    noEncontradosLista.forEach(cuenta => {
-        htmlFinal += `
-            <tr style="background:#fff5f5; color:#c0392b;">
-                <td>${cuenta}</td>
-                <td colspan="3" style="font-style: italic; font-size: 11px;">No encontrada en inventario SEM 17</td>
-            </tr>`;
-    });
-
-    tbody.innerHTML = htmlFinal;
+    renderizarTabla(resultadosActuales);
 }
