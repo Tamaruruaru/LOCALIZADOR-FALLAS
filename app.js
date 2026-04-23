@@ -1,7 +1,9 @@
-// 1. Carga automática mejorada
+let baseDeDatos = [];
+
 window.onload = async function() {
     try {
-        const respuesta = await fetch('SEM 17 Cuentas inventariadas Ciudad Juarez.xlsx');
+        // Usamos el nombre corto y nuevo
+        const respuesta = await fetch('inventario.csv');
         const contenido = await respuesta.text();
         
         const lineas = contenido.split(/\r?\n/);
@@ -9,64 +11,55 @@ window.onload = async function() {
         baseDeDatos = lineas
             .filter(l => l.trim() !== "")
             .map(l => {
-                // Esta línea detecta automáticamente si es coma, punto y coma o tabulador
-                let sep = l.includes(';') ? ';' : (l.includes('\t') ? '\t' : ',');
+                // Separamos por coma o punto y coma
+                let sep = l.includes(';') ? ';' : ',';
                 return l.split(sep).map(celda => celda.trim().replace(/^"|"$/g, ''));
             });
-        
-        // REVISIÓN DE SEGURIDAD
-        if (baseDeDatos[0].length <= 1) {
-            console.error("Error: Seguimos detectando solo 1 columna. Revisando separadores alternos...");
-        }
 
-        console.log("Inventario cargado. Columnas reales:", baseDeDatos[0].length);
-        alert("Listo. Se detectaron " + baseDeDatos[0].length + " columnas.");
+        console.log("Inventario cargado. Columnas:", baseDeDatos[0].length);
+        if(baseDeDatos[0].length > 1) {
+            document.body.insertAdjacentHTML('afterbegin', '<p style="color:green; font-weight:bold;">✅ Base de datos conectada</p>');
+        }
     } catch (e) {
-        console.error("Error al cargar el archivo:", e);
+        console.error("Error al cargar el CSV:", e);
+        alert("Error: No se encontró el archivo inventario.csv en el servidor.");
     }
 };
 
-// 2. Búsqueda ultra-sensible
 function buscarCuentas() {
-    const input = document.getElementById('reportInput').value;
+    const texto = document.getElementById('reportInput').value;
     const regex = /\d{10}/g; 
-    const encontrados = input.match(regex);
+    const encontrados = texto.match(regex);
     const cuentasUnicas = encontrados ? [...new Set(encontrados)] : [];
     
     const tabla = document.querySelector("#resultTable tbody");
-    tabla.innerHTML = "";
+    tabla.innerHTML = ""; 
 
-    if (cuentasUnicas.length === 0) return alert("No hay cuentas de 10 dígitos.");
+    if (cuentasUnicas.length === 0) return alert("No se detectaron cuentas de 10 dígitos.");
 
     cuentasUnicas.forEach(cuentaBuscada => {
-        const buscar = cuentaBuscada.replace(/^0+/, '');
+        const buscar = cuentaBuscada.replace(/^0+/, ''); // Quitar ceros a la izquierda
 
-        // Buscamos en TODA la fila para no fallar por número de columna
-        const fila = baseDeDatos.find(r => {
-            return r.some(celda => celda.replace(/^0+/, '') === buscar);
-        });
+        // Buscamos en toda la fila por seguridad
+        const fila = baseDeDatos.find(r => r.some(c => c.replace(/^0+/, '') === buscar));
 
         if (fila) {
-            // Buscamos el QR que empiece con 'TP' o que esté en la posición que suele estar
-            const qr = fila.find(c => c.startsWith('TP')) || fila[6] || "N/A";
+            // Buscamos los datos por su forma (TP para QR, 31 para Lat, -106 para Lon)
+            const qr = fila.find(c => c.toUpperCase().startsWith('TP')) || "N/A";
+            const lat = fila.find(c => c.startsWith('31.')) || "";
+            const lon = fila.find(c => c.includes('-106.')) || "";
             
-            // Buscamos coordenadas (celdas que tengan un punto y empiecen con 31 o -106)
-            const lat = fila.find(c => c.startsWith('31.')) || "Sin Lat";
-            const lon = fila.find(c => c.includes('-106.')) || "Sin Lon";
-            
-            const linkMapa = (lat !== "Sin Lat") 
-                ? `<a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank" style="background:#27ae60; color:white; padding:5px 10px; text-decoration:none; border-radius:4px;">📍 Ver Mapa</a>`
-                : "Sin GPS";
+            const urlMaps = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
 
             tabla.innerHTML += `
                 <tr>
                     <td><b>${cuentaBuscada}</b></td>
                     <td style="color:#e67e22; font-weight:bold;">${qr}</td>
                     <td>${lat}, ${lon}</td>
-                    <td>${linkMapa}</td>
+                    <td><a href="${urlMaps}" target="_blank" style="background:#27ae60; color:white; padding:5px 10px; text-decoration:none; border-radius:4px;">📍 Mapa</a></td>
                 </tr>`;
         } else {
-            tabla.innerHTML += `<tr><td>${cuentaBuscada}</td><td colspan="3" style="color:red;">No encontrada</td></tr>`;
+            tabla.innerHTML += `<tr><td>${cuentaBuscada}</td><td colspan="3" style="color:red;">No encontrada en inventario</td></tr>`;
         }
     });
 }
