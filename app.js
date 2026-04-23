@@ -36,63 +36,54 @@ function buscarCuentas() {
 
     if (cuentasUnicas.length === 0) return alert("No hay cuentas.");
 
-    let resultados = [];
+    let encontradosLista = [];
+    let noEncontradosLista = [];
 
-    // 1. Extraer datos de la memoria
+    // 1. Clasificar y obtener datos
     cuentasUnicas.forEach(cuentaBuscada => {
         const buscar = cuentaBuscada.replace(/^0+/, '');
         const fila = inventarioMap.get(buscar);
 
         if (fila) {
-            resultados.push({
+            encontradosLista.push({
                 cuenta: cuentaBuscada,
-                qr: fila[6] || "Z-SIN-QR", // Usamos Z para mandarlos al final
+                qr: (fila[6] || "SIN QR").trim().toUpperCase(),
                 lat: fila[16] || "",
-                lon: fila[17] || "",
-                encontrado: true
+                lon: fila[17] || ""
             });
         } else {
-            resultados.push({
-                cuenta: cuentaBuscada,
-                qr: "Z-NO-ENCONTRADA", 
-                lat: "",
-                lon: "",
-                encontrado: false
-            });
+            noEncontradosLista.push(cuentaBuscada);
         }
     });
 
-    // 2. ORDEN NATURAL (Acomoda TP2 antes de TP10 y agrupa por QR)
-    const colador = new Intl.Collator(undefined, {numeric: true, sensitivity: 'base'});
-    resultados.sort((a, b) => colador.compare(a.qr, b.qr));
+    // 2. ORDENAR alfabéticamente por QR (A-Z)
+    encontradosLista.sort((a, b) => {
+        return a.qr.localeCompare(b.qr, undefined, {numeric: true, sensitivity: 'base'});
+    });
 
-    // 3. RENDERIZAR (Construir tabla)
+    // 3. GENERAR HTML
     let htmlFinal = "";
-    let ultimoQR = "";
 
-    resultados.forEach(res => {
-        // Separador visual opcional: si cambia el QR, podemos poner una línea o espacio
-        const estiloFila = res.encontrado ? "" : "background:#fff5f5; color:#c0392b;";
-        const qrMostrable = res.encontrado ? res.qr : "NO ENCONTRADA";
+    // Primero los encontrados (Agrupados por QR)
+    encontradosLista.forEach(res => {
+        const urlMaps = `https://www.google.com/maps/search/?api=1&query=${res.lat},${res.lon}`;
+        htmlFinal += `
+            <tr>
+                <td><b>${res.cuenta}</b></td>
+                <td style="color:#d35400; font-weight:bold; background: #fff8f0;">${res.qr}</td>
+                <td style="font-size: 11px;">${res.lat}, ${res.lon}</td>
+                <td><a href="${urlMaps}" target="_blank" style="background:#27ae60; color:white; padding:4px 8px; text-decoration:none; border-radius:4px; font-size:11px;">📍 Mapa</a></td>
+            </tr>`;
+    });
 
-        if (res.encontrado) {
-            const urlMaps = `https://www.google.com/maps/search/?api=1&query=${res.lat},${res.lon}`;
-            htmlFinal += `
-                <tr style="${estiloFila}">
-                    <td><b>${res.cuenta}</b></td>
-                    <td style="color:#d35400; font-weight:bold; border-left: 3px solid #e67e22;">${qrMostrable}</td>
-                    <td style="font-size: 11px;">${res.lat}, ${res.lon}</td>
-                    <td><a href="${urlMaps}" target="_blank" style="background:#27ae60; color:white; padding:4px 8px; text-decoration:none; border-radius:4px; font-size:11px;">📍 Mapa</a></td>
-                </tr>`;
-        } else {
-            htmlFinal += `
-                <tr style="${estiloFila}">
-                    <td>${res.cuenta}</td>
-                    <td colspan="3" style="font-style: italic;">Sin registro en inventario</td>
-                </tr>`;
-        }
+    // Al final los no encontrados
+    noEncontradosLista.forEach(cuenta => {
+        htmlFinal += `
+            <tr style="background:#fff5f5; color:#c0392b;">
+                <td>${cuenta}</td>
+                <td colspan="3" style="font-style: italic; font-size: 11px;">No encontrada en inventario</td>
+            </tr>`;
     });
 
     tbody.innerHTML = htmlFinal;
-}
 }
