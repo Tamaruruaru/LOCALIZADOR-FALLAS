@@ -19,18 +19,17 @@
         <button onclick="buscarCuentas()">Localizar QRs</button>
     </div>
 
-    <table id="resultTable">
-        <thead>
-            <tr>
-                <th>Cuenta</th>
-                <th>Estatus</th>
-                <th>QR</th>
-                <th>Coordenadas</th>
-                <th>Mapa</th>
-            </tr>
-        </thead>
-        <tbody></tbody>
-    </table>
+<table id="resultTable">
+    <thead>
+        <tr>
+            <th onclick="ordenarTabla(0)" style="cursor:pointer">Cuenta ↕️</th>
+            <th onclick="ordenarTabla(1)" style="cursor:pointer">QR ↕️</th>
+            <th>Coordenadas</th>
+            <th>Mapa</th>
+        </tr>
+    </thead>
+    <tbody></tbody>
+</table>
 
     <script src="app.js"></script>
 </body>
