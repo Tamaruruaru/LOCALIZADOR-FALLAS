@@ -1,5 +1,6 @@
 let inventarioMap = new Map();
-let resultadosActuales = []; // Guardaremos aquí lo que se encontró
+let resultadosActuales = []; 
+let ordenAscendente = true;
 
 window.onload = async function() {
     try {
@@ -16,8 +17,10 @@ window.onload = async function() {
                 inventarioMap.set(cuentaLimpia, columnas);
             }
         });
-        console.log("Inventario cargado.");
-    } catch (e) { console.error("Error al cargar"); }
+        console.log("Inventario cargado correctamente.");
+    } catch (e) { 
+        console.error("Error al cargar el CSV:", e); 
+    }
 };
 
 function buscarCuentas() {
@@ -26,7 +29,7 @@ function buscarCuentas() {
     const encontrados = texto.match(regex);
     const cuentasUnicas = encontrados ? [...new Set(encontrados)] : [];
     
-    resultadosActuales = []; // Limpiar resultados previos
+    resultadosActuales = []; 
 
     cuentasUnicas.forEach(cuentaBuscada => {
         const buscar = cuentaBuscada.replace(/^0+/, '');
@@ -37,7 +40,8 @@ function buscarCuentas() {
                 cuenta: cuentaBuscada,
                 qr: (fila[6] || "SIN QR").trim().toUpperCase(),
                 lat: fila[16] || "",
-                lon: fila[17] || ""
+                lon: fila[17] || "",
+                encontrado: true
             });
         } else {
             resultadosActuales.push({
@@ -51,31 +55,31 @@ function buscarCuentas() {
     renderizarTabla(resultadosActuales);
 }
 
-// Función para dibujar la tabla
 function renderizarTabla(datos) {
     const tbody = document.querySelector("#resultTable tbody");
     let html = "";
 
     datos.forEach(res => {
-        if (res.qr !== "ZZ_NO_ENCONTRADA") {
+        if (res.encontrado) {
+            // URL CORREGIDA: Sin el '2{' que sobraba
             const urlMaps = `https://www.google.com/maps/search/?api=1&query=${res.lat},${res.lon}`;
             html += `
                 <tr>
                     <td><b>${res.cuenta}</b></td>
-                    <td style="color:#d35400; font-weight:bold;">${res.qr}</td>
+                    <td style="color:#d35400; font-weight:bold; background:#fff8f0;">${res.qr}</td>
                     <td style="font-size: 11px;">${res.lat}, ${res.lon}</td>
                     <td><a href="${urlMaps}" target="_blank" style="background:#27ae60; color:white; padding:4px 8px; text-decoration:none; border-radius:4px; font-size:11px;">📍 Ver Mapa</a></td>
                 </tr>`;
         } else {
-            html += `<tr style="background:#fff5f5; color:#c0392b;"><td>${res.cuenta}</td><td colspan="3">No encontrada</td></tr>`;
+            html += `<tr style="background:#fff5f5; color:#c0392b;"><td>${res.cuenta}</td><td colspan="3" style="font-size:11px; font-style:italic;">No encontrada</td></tr>`;
         }
     });
     tbody.innerHTML = html;
 }
 
-// FUNCIÓN DE FILTRO TIPO EXCEL
-let ordenAscendente = true;
 function ordenarTabla(columnaIndex) {
+    if (resultadosActuales.length === 0) return;
+    
     ordenAscendente = !ordenAscendente;
     
     resultadosActuales.sort((a, b) => {
