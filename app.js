@@ -1,7 +1,7 @@
 // 1. Carga automática mejorada
 window.onload = async function() {
     try {
-        const respuesta = await fetch('SEM 17 Cuentas inventariadas Ciudad Juarez.xlsx - Sheet1.csv');
+        const respuesta = await fetch('SEM 17 Cuentas inventariadas Ciudad Juarez.xlsx');
         const contenido = await respuesta.text();
         
         const lineas = contenido.split(/\r?\n/);
