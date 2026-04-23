@@ -1,30 +1,32 @@
 let baseDeDatos = [];
 
-// 1. Carga y limpieza del archivo
-document.getElementById('csvFile').addEventListener('change', function(e) {
-    const reader = new FileReader();
-    reader.onload = function() {
-        const contenido = reader.result;
-        // Detectamos el separador (punto y coma o coma)
+// Esto carga el archivo automáticamente al abrir la web
+window.onload = async function() {
+    try {
+        // Asegúrate de que el nombre del archivo en GitHub sea exactamente este:
+        const respuesta = await fetch('SEM 17 Cuentas inventariadas Ciudad Juarez.xlsx - Sheet1.csv');
+        const contenido = await respuesta.text();
+        
+        // Detectar separador (coma o punto y coma)
         const separador = contenido.includes(';') ? ';' : ',';
         const lineas = contenido.split(/\r?\n/);
         
         baseDeDatos = lineas
-            .filter(l => l.trim() !== "") // Quitamos líneas vacías
-            .map(l => l.split(separador).map(celda => 
-                celda.trim().replace(/^"|"$/g, '') // Quitamos espacios y comillas
-            ));
+            .filter(l => l.trim() !== "")
+            .map(l => l.split(separador).map(celda => celda.trim().replace(/^"|"$/g, '')));
         
-        console.log("Primer fila detectada:", baseDeDatos[0]);
-        alert("Archivo cargado con éxito. Se detectaron " + (baseDeDatos.length - 1) + " registros.");
-    };
-    reader.readAsText(e.target.files[0]);
-});
+        console.log("Inventario cargado automáticamente:", baseDeDatos[0]);
+        document.body.insertAdjacentHTML('afterbegin', '<p style="color:green; padding:10px;">✅ Inventario cargado automáticamente</p>');
+    } catch (error) {
+        console.error("Error cargando el archivo:", error);
+        alert("No se pudo cargar el archivo automático. Revisa que el nombre sea correcto en el repo.");
+    }
+};
 
-// 2. Proceso de búsqueda
 function buscarCuentas() {
     const input = document.getElementById('reportInput').value;
-    const regex = /\d{10}/g; // Busca bloques de 10 números
+    // Buscamos cualquier serie de 10 números
+    const regex = /\d{10}/g;
     const encontrados = input.match(regex);
     const cuentasUnicas = encontrados ? [...new Set(encontrados)] : [];
     
@@ -32,42 +34,32 @@ function buscarCuentas() {
     tabla.innerHTML = "";
 
     if (cuentasUnicas.length === 0) {
-        alert("No se encontraron números de 10 dígitos en el texto pegado.");
+        alert("No se encontraron cuentas de 10 dígitos.");
         return;
     }
 
     cuentasUnicas.forEach(cuentaBuscada => {
-        // Quitamos ceros a la izquierda para comparar (ej: 0142... -> 142...)
         const buscar = cuentaBuscada.replace(/^0+/, '');
 
-        // Buscamos en la columna 8 (índice 7)
-        const fila = baseDeDatos.find(r => {
-            if (!r[7]) return false;
-            return r[7].replace(/^0+/, '') === buscar;
-        });
+        // BÚSQUEDA TODOTERRENO: Busca en TODO el renglón, no solo en una columna
+        const fila = baseDeDatos.find(r => r.join('|').replace(/0+/g, '').includes(buscar));
 
         if (fila) {
-            const qr = fila[6];      // Columna G
-            const lat = fila[16];    // Columna Q
-            const lon = fila[17];    // Columna R
-            const coords = `${lat},${lon}`;
+            // Basado en tu archivo real: QR es col 6, Lat es 16, Lon es 17
+            const qr = fila[6] || "N/A";
+            const lat = fila[16];
+            const lon = fila[17];
             
-            // Link de Google Maps corregido
-            const urlMaps = `https://www.google.com/maps/search/?api=1&query=${coords}`;
-
-            tabla.innerHTML += `
+            const tr = `
                 <tr>
                     <td><b>${cuentaBuscada}</b></td>
-                    <td style="color: #d35400; font-weight: bold;">${qr}</td>
-                    <td>${coords}</td>
-                    <td><a href="${urlMaps}" target="_blank" class="btn-map">📍 Abrir Mapa</a></td>
+                    <td style="color:#e67e22; font-weight:bold;">${qr}</td>
+                    <td>${lat}, ${lon}</td>
+                    <td><a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank" style="background:#27ae60; color:white; padding:5px; text-decoration:none; border-radius:4px;">📍 Mapa</a></td>
                 </tr>`;
+            tabla.innerHTML += tr;
         } else {
-            tabla.innerHTML += `
-                <tr style="background: #fff0f0;">
-                    <td>${cuentaBuscada}</td>
-                    <td colspan="3" style="color: #c0392b;">No encontrado en el Excel SEM 17</td>
-                </tr>`;
+            tabla.innerHTML += `<tr><td>${cuentaBuscada}</td><td colspan="3" style="color:red;">No encontrada en el Excel</td></tr>`;
         }
     });
 }
